@@ -13,23 +13,34 @@ export async function GET() {
       );
     }
 
-    /**
-     * Fetch the 20 most recent prompt generations for the current user.
-     * We join with the users table to ensure the user exists and matches.
-     */
+    // First, get the user ID from the email
+    const { data: user, error: userError } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('email', session.user.email)
+      .single();
+
+    if (userError || !user) {
+      console.error('User not found:', userError);
+      return NextResponse.json({ history: [] });
+    }
+
+    // Fetch the 20 most recent prompt generations for the current user
     const { data: history, error } = await supabaseAdmin
       .from('prompt_history')
-      .select('*, users!inner(email)')
-      .eq('users.email', session.user.email)
+      .select('*')
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(20);
 
     if (error) {
       console.error('Fetch History Error:', error);
-      throw error;
+      return NextResponse.json({ history: [] });
     }
 
-    return NextResponse.json({ history });
+    console.log('✅ Fetched history for user:', session.user.email, '- Count:', history?.length || 0);
+
+    return NextResponse.json({ history: history || [] });
   } catch (error: any) {
     console.error('History API Error:', error);
     return NextResponse.json(

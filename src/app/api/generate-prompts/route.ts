@@ -231,13 +231,19 @@ export async function POST(req: Request) {
 
     // SAVE TO HISTORY IF AUTHENTICATED
     if (userId) {
-      await supabaseAdmin.from('prompt_history').insert({
+      const { error: historyError } = await supabaseAdmin.from('prompt_history').insert({
         user_id: userId,
         use_case: payload.userInput.useCase,
         problem_description: payload.userInput.problemDescription,
         challenges: payload.userInput.challenges,
         generated_pack: pack,
       });
+
+      if (historyError) {
+        console.error('Failed to save to history:', historyError);
+      } else {
+        console.log('✅ Saved to history for user:', userId);
+      }
     }
 
     return NextResponse.json({ pack });

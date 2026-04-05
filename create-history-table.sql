@@ -3,7 +3,7 @@
 
 CREATE TABLE IF NOT EXISTS prompt_history (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL,
   use_case text NOT NULL,
   problem_description text NOT NULL,
   challenges text NOT NULL,
@@ -17,14 +17,13 @@ CREATE INDEX IF NOT EXISTS idx_prompt_history_user_id ON prompt_history(user_id)
 -- Create index on created_at for sorting
 CREATE INDEX IF NOT EXISTS idx_prompt_history_created_at ON prompt_history(created_at DESC);
 
--- Enable Row Level Security (optional but recommended)
+-- Enable Row Level Security
 ALTER TABLE prompt_history ENABLE ROW LEVEL SECURITY;
 
--- Create policy to allow users to see only their own history
-CREATE POLICY "Users can view their own history"
-ON prompt_history
-FOR SELECT
-USING (auth.uid() = user_id);
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Service role can insert history" ON prompt_history;
+DROP POLICY IF EXISTS "Service role can select history" ON prompt_history;
+DROP POLICY IF EXISTS "Users can view their own history" ON prompt_history;
 
 -- Create policy to allow service role to insert
 CREATE POLICY "Service role can insert history"
@@ -32,6 +31,13 @@ ON prompt_history
 FOR INSERT
 TO service_role
 WITH CHECK (true);
+
+-- Create policy to allow service role to select (for API routes)
+CREATE POLICY "Service role can select history"
+ON prompt_history
+FOR SELECT
+TO service_role
+USING (true);
 
 -- Add comment
 COMMENT ON TABLE prompt_history IS 'Stores user prompt generation history';
