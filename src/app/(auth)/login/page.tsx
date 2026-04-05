@@ -29,8 +29,12 @@ function LoginForm() {
       if (res?.error) {
         setError('Invalid email or password');
         setLoading(false);
+      } else if (res?.ok) {
+        // Force a hard redirect to ensure proper navigation
+        window.location.href = callbackUrl;
       } else {
-        router.push(callbackUrl);
+        setError('Login failed. Please try again.');
+        setLoading(false);
       }
     } catch (err) {
       setError('An error occurred. Please try again.');

@@ -9,17 +9,23 @@ export const authConfig = {
       const isLoggedIn = !!auth?.user;
       const isAuthPage = nextUrl.pathname.startsWith("/login") || 
                          nextUrl.pathname.startsWith("/signup") ||
-                         nextUrl.pathname.startsWith("/forgot-password");
+                         nextUrl.pathname.startsWith("/forgot-password") ||
+                         nextUrl.pathname.startsWith("/reset-password");
 
+      // Allow access to auth pages when not logged in
       if (isAuthPage) {
-        if (isLoggedIn) {
+        if (isLoggedIn && nextUrl.pathname.startsWith("/login")) {
+          // Redirect logged-in users away from login page
           return Response.redirect(new URL("/", nextUrl));
         }
         return true;
       }
 
+      // Protect all other pages - require login
       if (!isLoggedIn) {
-        return false; // This will trigger a redirect to the signIn page defined above
+        const loginUrl = new URL("/login", nextUrl);
+        loginUrl.searchParams.set("callbackUrl", nextUrl.pathname);
+        return Response.redirect(loginUrl);
       }
 
       return true;
