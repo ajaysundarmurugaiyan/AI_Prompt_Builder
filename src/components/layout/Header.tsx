@@ -26,7 +26,8 @@ export function Header() {
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="hidden sm:block">
+            {/* Desktop/Tablet Theme Toggle - hidden on mobile */}
+            <div className="hidden md:block">
               <ThemeToggle />
             </div>
             
@@ -68,16 +69,17 @@ export function Header() {
         {/* Mobile Nav Dropdown - Overlays the screen */}
         {isMenuOpen && (
           <>
-            {/* Full-screen Backdrop to close menu on outside click */}
+            {/* Full-screen Backdrop to close menu on outside click - NO BLUR */}
             <div 
-              className="fixed inset-0 z-40 bg-zinc-950/20 backdrop-blur-[2px] transition-all lg:hidden"
+              className="fixed inset-0 z-40 bg-zinc-950/20 transition-all lg:hidden"
               onClick={() => setIsMenuOpen(false)}
             />
             {/* Fixed menu panel below header */}
             <div className="fixed inset-x-0 top-16 z-50 border-b border-border bg-background px-4 pb-8 pt-4 shadow-2xl lg:hidden animate-in slide-in-from-top-4 duration-300">
               <div className="flex flex-col gap-6">
                 <HeaderNav onAction={() => setIsMenuOpen(false)} />
-                <div className="flex flex-col items-center gap-3 pt-6 border-t border-border sm:hidden">
+                {/* Theme toggle for mobile/tablet - centered */}
+                <div className="flex flex-col items-center gap-3 pt-6 border-t border-border md:hidden">
                   <span className="text-[10px] font-bold uppercase tracking-widest text-[#f43f5e]">Theme</span>
                   <ThemeToggle />
                 </div>
