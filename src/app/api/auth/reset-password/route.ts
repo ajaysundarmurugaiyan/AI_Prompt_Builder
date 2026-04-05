@@ -1,15 +1,14 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/db/supabase';
 import bcrypt from 'bcryptjs';
-import { cookies } from 'next/headers';
 
 export async function POST(req: Request) {
   try {
-    const { password } = await req.json();
+    const { token, email, password } = await req.json();
 
-    if (!password) {
+    if (!token || !email || !password) {
       return NextResponse.json(
-        { message: 'Password is required' },
+        { message: 'Missing required fields' },
         { status: 400 }
       );
     }
@@ -21,57 +20,66 @@ export async function POST(req: Request) {
       );
     }
 
-    // Get the session from cookies (Supabase sets this during password reset flow)
-    const cookieStore = await cookies();
-    const accessToken = cookieStore.get('sb-access-token')?.value;
-    const refreshToken = cookieStore.get('sb-refresh-token')?.value;
+    const lowercaseEmail = email.toLowerCase();
 
-    if (!accessToken) {
-      return NextResponse.json(
-        { message: 'Invalid or expired reset session' },
-        { status: 401 }
-      );
-    }
-
-    // Get user from Supabase Auth using the access token
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(accessToken);
+    // Find user with matching token and email
+    const { data: user, error: userError } = await supabaseAdmin
+      .from('users')
+      .select('id, reset_token, reset_token_expiry')
+      .eq('email', lowercaseEmail)
+      .eq('reset_token', token)
+      .single();
 
     if (userError || !user) {
       return NextResponse.json(
         { message: 'Invalid or expired reset token' },
-        { status: 401 }
+        { status: 400 }
       );
     }
 
-    // Update password in Supabase Auth
-    const { error: updateAuthError } = await supabaseAdmin.auth.admin.updateUserById(
-      user.id,
-      { password: password }
-    );
+    // Check if token has expired
+    if (user.reset_token_expiry) {
+      const expiryDate = new Date(user.reset_token_expiry);
+      if (expiryDate < new Date()) {
+        return NextResponse.json(
+          { message: 'Reset token has expired. Please request a new one.' },
+          { status: 400 }
+        );
+      }
+    }
 
-    if (updateAuthError) {
-      console.error('Error updating Supabase Auth password:', updateAuthError);
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Update password and clear reset token in custom table
+    const { error: updateError } = await supabaseAdmin
+      .from('users')
+      .update({
+        password_hash: hashedPassword,
+        reset_token: null,
+        reset_token_expiry: null,
+      })
+      .eq('id', user.id);
+
+    if (updateError) {
+      console.error('Error updating password:', updateError);
       return NextResponse.json(
         { message: 'Failed to update password' },
         { status: 500 }
       );
     }
 
-    // Hash the new password for custom table
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Update password in custom users table
-    const { error: updateTableError } = await supabaseAdmin
-      .from('users')
-      .update({ password_hash: hashedPassword })
-      .eq('id', user.id);
-
-    if (updateTableError) {
-      console.error('Error updating custom table password:', updateTableError);
-      // Auth password is already updated, so we continue
+    // Try to update in Supabase Auth if user exists there
+    try {
+      await supabaseAdmin.auth.admin.updateUserById(user.id, {
+        password: password,
+      });
+      console.log('✅ Password updated in both custom table and Supabase Auth');
+    } catch (authErr) {
+      console.log('ℹ️  Password updated in custom table only (Supabase Auth not available)');
     }
 
-    console.log('✅ Password reset successfully for user:', user.email);
+    console.log('✅ Password reset successfully for:', lowercaseEmail);
 
     return NextResponse.json(
       { message: 'Password reset successfully' },

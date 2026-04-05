@@ -3,13 +3,6 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { createClient } from '@supabase/supabase-js';
-
-// Create a client-side Supabase client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-);
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -21,19 +14,16 @@ function ResetPasswordForm() {
   const [success, setSuccess] = useState(false);
   const [validating, setValidating] = useState(true);
 
-  useEffect(() => {
-    // Check if we have the recovery token from Supabase
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const accessToken = hashParams.get('access_token');
-    const type = hashParams.get('type');
+  const token = searchParams?.get('token');
+  const email = searchParams?.get('email');
 
-    if (type === 'recovery' && accessToken) {
-      setValidating(false);
-    } else {
+  useEffect(() => {
+    // Check if we have the required parameters
+    if (!token || !email) {
       setError('Invalid or missing reset link. Please request a new password reset.');
-      setValidating(false);
     }
-  }, []);
+    setValidating(false);
+  }, [token, email]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,7 +46,7 @@ function ResetPasswordForm() {
       const res = await fetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ token, email, password }),
       });
 
       const data = await res.json();
