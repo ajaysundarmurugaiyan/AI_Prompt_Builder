@@ -1,6 +1,5 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import bcrypt from "bcryptjs";
 import { supabaseAdmin } from "@/lib/db/supabase";
 import { authConfig } from "./auth.config";
 
@@ -18,30 +17,27 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         const email = credentials.email.toString().toLowerCase();
         
-        // Fetch user from Supabase using the administrative client
-        const { data: user, error } = await supabaseAdmin
-          .from('users')
-          .select('*')
-          .eq('email', email)
-          .single();
+        try {
+          // Sign in with Supabase Auth
+          const { data, error } = await supabaseAdmin.auth.signInWithPassword({
+            email: email,
+            password: credentials.password as string,
+          });
 
-        if (error || !user) {
-          console.error('Auth User Not Found:', error);
+          if (error || !data.user) {
+            console.error('Auth Error:', error?.message);
+            return null;
+          }
+
+          return {
+            id: data.user.id,
+            email: data.user.email!,
+            name: data.user.user_metadata?.name || data.user.email,
+          };
+        } catch (err) {
+          console.error('Auth Exception:', err);
           return null;
         }
-
-        const isValid = await bcrypt.compare(
-          credentials.password as string,
-          user.password_hash
-        );
-
-        if (!isValid) return null;
-
-        return {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-        };
       },
     }),
   ],

@@ -77,7 +77,7 @@ function ResetPasswordForm() {
     );
   }
 
-  if (error && !password) {
+  if (error && !token) {
     return (
       <div className="w-full max-w-md mx-auto space-y-8 py-10">
         <div className="text-center">

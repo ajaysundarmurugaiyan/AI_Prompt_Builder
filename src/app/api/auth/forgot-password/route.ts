@@ -12,65 +12,52 @@ export async function POST(req: Request) {
 
     const lowercaseEmail = email.toLowerCase();
 
-    // Check if user exists in our custom users table
-    const { data: user, error: userError } = await supabaseAdmin
-      .from('users')
-      .select('id, email, name')
-      .eq('email', lowercaseEmail)
-      .single();
-
-    // Always return success to prevent email enumeration attacks
-    if (!userError && user) {
-      // Generate a password reset token
-      const resetToken = crypto.randomBytes(32).toString('hex');
-      const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
-
-      // Store the reset token in the users table
-      const { error: updateError } = await supabaseAdmin
-        .from('users')
-        .update({
-          reset_token: resetToken,
-          reset_token_expiry: resetTokenExpiry.toISOString(),
-        })
-        .eq('email', lowercaseEmail);
-
-      if (updateError) {
-        console.error('Error storing reset token:', updateError);
-      } else {
-        // Generate the reset link
-        const resetLink = `${process.env.NEXTAUTH_URL}/reset-password?token=${resetToken}&email=${encodeURIComponent(lowercaseEmail)}`;
-        
-        // Log the link (in production, you would send an email here)
-        console.log('\n╔═══════════════════════════════════════════╗');
-        console.log('║     PASSWORD RESET LINK GENERATED        ║');
-        console.log('╚═══════════════════════════════════════════╝');
-        console.log('📧 Email:', lowercaseEmail);
-        console.log('🔗 Link:', resetLink);
-        console.log('⏱️  Expires in: 1 hour');
-        console.log('═══════════════════════════════════════════\n');
-        
-        // Try to send email via Supabase Auth if user exists there
-        try {
-          const { error: authResetError } = await supabaseAdmin.auth.resetPasswordForEmail(
-            lowercaseEmail,
-            {
-              redirectTo: resetLink,
-            }
-          );
-          
-          if (!authResetError) {
-            console.log('✅ Email sent via Supabase Auth');
-          }
-        } catch (authErr) {
-          console.log('ℹ️  Supabase Auth email not available, use console link');
-        }
-      }
+    // Check if user exists in Supabase Auth
+    const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+    
+    if (listError) {
+      console.error('Error listing users:', listError);
+      return NextResponse.json({ message: 'Error checking email' }, { status: 500 });
     }
 
-    // Always return success message (security best practice)
+    const userExists = users.find(user => user.email?.toLowerCase() === lowercaseEmail);
+
+    if (!userExists) {
+      return NextResponse.json({ 
+        message: 'Email does not exist in our system',
+        exists: false 
+      }, { status: 404 });
+    }
+
+    // Generate a temporary reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
+
+    // Store token in user metadata
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+      userExists.id,
+      {
+        user_metadata: {
+          ...userExists.user_metadata,
+          reset_token: resetToken,
+          reset_token_expiry: resetTokenExpiry.toISOString(),
+        }
+      }
+    );
+
+    if (updateError) {
+      console.error('Error storing reset token:', updateError);
+      return NextResponse.json({ message: 'Error processing request' }, { status: 500 });
+    }
+
+    console.log('✅ Email verified, reset token generated for:', lowercaseEmail);
+
     return NextResponse.json({ 
-      message: 'If an account exists with that email, a password reset link has been sent. Please check your email or contact support.' 
-    });
+      message: 'Email verified successfully',
+      exists: true,
+      token: resetToken,
+      email: lowercaseEmail
+    }, { status: 200 });
   } catch (err) {
     console.error('Forgot Password API Error:', err);
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
