@@ -13,15 +13,18 @@ export async function GET() {
       );
     }
 
-    // First, get the user ID from the email
-    const { data: user, error: userError } = await supabaseAdmin
-      .from('users')
-      .select('id')
-      .eq('email', session.user.email)
-      .single();
+    // Get user ID from Supabase Auth
+    const { data: { users }, error: listError } = await supabaseAdmin.auth.admin.listUsers();
+    
+    if (listError) {
+      console.error('Error listing users:', listError);
+      return NextResponse.json({ history: [] });
+    }
 
-    if (userError || !user) {
-      console.error('User not found:', userError);
+    const user = users.find(u => u.email?.toLowerCase() === session.user.email?.toLowerCase());
+
+    if (!user) {
+      console.error('User not found in Supabase Auth');
       return NextResponse.json({ history: [] });
     }
 

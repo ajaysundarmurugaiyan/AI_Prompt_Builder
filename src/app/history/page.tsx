@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 interface HistoryItem {
   id: string;
@@ -41,6 +42,11 @@ export default function HistoryPage() {
     }
   };
 
+  const getPromptCount = (pack: any) => {
+    if (!pack || !pack.prompts) return 0;
+    return pack.prompts.length;
+  };
+
   if (status === 'loading' || loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -57,7 +63,7 @@ export default function HistoryPage() {
             Generation <span className="text-[#f43f5e]">History</span>
           </h1>
           <p className="mt-3 text-sm text-muted-foreground max-w-lg">
-            A secure record of your past 20 AI-engineered prompt architectures.
+            Your past AI-engineered prompt packs. Click any item to view all prompts.
           </p>
         </div>
         <div className="flex items-center justify-center gap-2 px-4 py-2 bg-muted/20 rounded-xl border border-border">
@@ -85,9 +91,10 @@ export default function HistoryPage() {
       ) : (
         <div className="grid grid-cols-1 gap-6 animate-in fade-in duration-500">
           {history.map((item, idx) => (
-            <div 
-              key={item.id} 
-              className="bg-card group hover:border-[#f43f5e]/40 transition-all p-8 rounded-3xl border border-border shadow-xl overflow-hidden backdrop-blur-sm relative"
+            <Link
+              key={item.id}
+              href={`/history/${item.id}`}
+              className="bg-card group hover:border-[#f43f5e]/40 transition-all p-8 rounded-3xl border border-border shadow-xl overflow-hidden backdrop-blur-sm relative block"
             >
               <div className="absolute top-0 left-0 w-1 h-full bg-[#f43f5e]/0 group-hover:bg-[#f43f5e]/40 transition-all" />
               
@@ -95,7 +102,7 @@ export default function HistoryPage() {
                 <div className="flex-1 space-y-6">
                   <div className="flex flex-wrap items-center gap-3">
                     <span className="bg-[#f43f5e]/10 text-[#f43f5e] px-3 py-1.5 rounded-lg text-[10px] font-extrabold uppercase tracking-widest border border-[#f43f5e]/10">
-                      Case: {item.use_case}
+                      {item.use_case}
                     </span>
                     <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
                       {new Date(item.created_at).toLocaleDateString(undefined, { 
@@ -106,6 +113,9 @@ export default function HistoryPage() {
                         minute: '2-digit'
                       })}
                     </span>
+                    <span className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-3 py-1.5 rounded-lg text-[10px] font-extrabold uppercase tracking-widest border border-emerald-500/10">
+                      {getPromptCount(item.generated_pack)} Prompts
+                    </span>
                   </div>
                   
                   <div className="space-y-2">
@@ -113,33 +123,43 @@ export default function HistoryPage() {
                       {item.problem_description}
                     </h3>
                     <div className="flex gap-2">
-                      <span className="text-[#f43f5e] text-lg font-serif">“</span>
+                      <span className="text-[#f43f5e] text-lg font-serif">"</span>
                       <p className="text-sm text-muted-foreground leading-relaxed italic max-w-2xl">
                         {item.challenges}
                       </p>
-                      <span className="text-[#f43f5e] text-lg font-serif self-end">”</span>
+                      <span className="text-[#f43f5e] text-lg font-serif self-end">"</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3 px-4 py-4 lg:py-0 border-t lg:border-t-0 lg:border-l border-border">
-                  <button 
-                    onClick={() => {
-                      console.log('Viewing pack:', item.generated_pack);
-                      alert('Prompt Pack Preview:\nCheck console for full JSON structure.');
-                    }}
-                    className="flex-1 lg:flex-none h-11 px-6 bg-muted/10 hover:bg-muted/20 text-foreground rounded-xl text-xs font-bold transition-all border border-border active:scale-95"
-                  >
-                    View JSON
-                  </button>
-                  <button 
-                    className="flex-1 lg:flex-none h-11 px-6 bg-[#f43f5e] hover:bg-[#e11d48] text-white rounded-xl text-xs font-bold shadow-lg shadow-[#f43f5e]/10 transition-all active:scale-95"
-                  >
-                    Export Pack
-                  </button>
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <div className="text-3xl font-bold text-[#f43f5e]">
+                      {getPromptCount(item.generated_pack)}
+                    </div>
+                    <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest text-center">
+                      Prompts<br/>Available
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+              
+              <div className="mt-6 pt-6 border-t border-border flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Click to view all prompts →</span>
+                <div className="flex gap-2">
+                  {item.generated_pack?.prompts?.slice(0, 3).map((p: any, i: number) => (
+                    <span key={i} className="px-2 py-1 bg-muted/20 rounded text-[10px] font-medium text-muted-foreground uppercase">
+                      {p.id}
+                    </span>
+                  ))}
+                  {getPromptCount(item.generated_pack) > 3 && (
+                    <span className="px-2 py-1 bg-muted/20 rounded text-[10px] font-medium text-muted-foreground">
+                      +{getPromptCount(item.generated_pack) - 3} more
+                    </span>
+                  )}
+                </div>
+              </div>
+            </Link>
           ))}
         </div>
       )}
